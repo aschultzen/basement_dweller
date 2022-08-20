@@ -1,46 +1,45 @@
 #!/bin/sh
-# $FreeBSD: head/www/searx/files/searx.in 463944 2018-03-09 08:34:57Z yuri $
 
-# PROVIDE: searx
+# PROVIDE: basement_dweller
 # REQUIRE: DAEMON NETWORKING
 # BEFORE: LOGIN
 # KEYWORD: shutdown
 
-# Add the following lines to /etc/rc.conf to enable searx:
-# searx_enable="YES"
+# Add the following lines to /etc/rc.conf to enable basement_dweller:
+# basement_dweller_enable="YES"
 #
-# searx_enable (bool):    Set to YES to enable searx
+# basement_dweller_enable (bool):    Set to YES to enable basement_dweller
 #                Default: NO
-# searx_conf (str):        searx configuration file
-#                Default: ${PREFIX}/etc/searx.conf
-# searx_user (str):        searx daemon user
-#                Default: searx
-# searx_group (str):        searx daemon group
-#                Default: searx
-# searx_flags (str):        Extra flags passed to searx
+# basement_dweller_conf (str):        basement_dweller configuration file
+#                Default: ${PREFIX}/etc/basement_dweller.conf
+# basement_dweller_user (str):        basement_dweller daemon user
+#                Default: basement_dweller
+# basement_dweller_group (str):        basement_dweller daemon group
+#                Default: basement_dweller
+# basement_dweller_flags (str):        Extra flags passed to basement_dweller
 
 . /etc/rc.subr
 
-name="searx"
-rcvar=searx_enable
+name="basement_dweller"
+rcvar=basement_dweller_enable
 
-: ${searx_enable:="NO"}
-: ${searx_user:="www"}
-: ${searx_group:="www"}
-: ${searx_flags:=""}
+: ${basement_dweller_enable:="NO"}
+: ${basement_dweller_user:="www"}
+: ${basement_dweller_group:="www"}
+: ${basement_dweller_flags:=""}
 
 # daemon
 pidfile="/var/run/${name}.pid"
-python="/usr/local/bin/python3.7"
-script_py="/usr/local/lib/python3.7/site-packages/${name}/webapp.py"
+python="/usr/local/bin/python"
+script_py="/home/aril/${name}/basement_dweller.py"
 command=/usr/sbin/daemon
 procname="daemon"
 command_args=" -c -f -P ${pidfile} ${python} ${script_py}"
-start_precmd="searx_precmd"
+start_precmd="basement_dweller_precmd"
 
-searx_precmd()
+basement_dweller_precmd()
 {
-    install -o ${searx_user} /dev/null ${pidfile}
+    install -o ${basement_dweller_user} /dev/null ${pidfile}
 }
 
 load_rc_config $name

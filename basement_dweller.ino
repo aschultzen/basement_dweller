@@ -14,11 +14,18 @@ const char* ssid = "umad";
 const char* password = "usickcunt001";
 const char* serverName = "http://192.168.1.196:5000/api/sample/";
 
+const int left_button = 32;     
+const int right_button = 33;     
+const int red_button = 35;     
+const int ledPin = 25;
+
+#define BUTTON_PIN_BITMASK 0x800000000
+
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP  60       /* Time ESP32 will go to sleep (in seconds) */
 #define CLOCK_TWEAK 0.05 * uS_TO_S_FACTOR
 #define max_samples 290
-#define dweller_id 1
+#define dweller_id 2
 
 typedef struct {
     int humid;
@@ -45,29 +52,44 @@ int measure() {
 }
 
 void disableWiFi(){
-    setCpuFrequencyMhz(10);
     WiFi.disconnect(true);  // Disconnect from the network
     WiFi.mode(WIFI_OFF);    // Switch WiFi off
     btStop();
 }
 
 void enableWiFi(){
-    setCpuFrequencyMhz(80);
     WiFi.disconnect(false);  // Reconnect the network
     WiFi.mode(WIFI_STA);    // Switch WiFi off
- 
-    Serial2.println("START WIFI");
     WiFi.begin(ssid, password);
  
     while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial2.print(".");
+        1+1;
     }
- 
-    Serial2.println("");
-    Serial2.println("WiFi connected");
-    Serial2.println("IP address: ");
-    Serial2.println(WiFi.localIP());
+}
+
+int one_shot() {
+    WiFiUDP ntpUDP;
+    NTPClient timeClient(ntpUDP);
+    char post_buff[256];
+    enableWiFi();
+    timeClient.begin();  
+    timeClient.update();  
+    WiFiClient client;
+    HTTPClient http;
+    int timestamp = timeClient.getEpochTime();
+    Adafruit_BME280 bme;
+    int status = bme.begin(0x76);
+    int humid = bme.readHumidity();
+    float temp = bme.readTemperature();
+    float pres = bme.readPressure() / 100.0F;
+    memset(post_buff, 0, 256);
+    sprintf(post_buff, "{\"dweller\":\"%d\",\"temp\":\"%f\",\"humid\":\"%d\",\"timestamp\":\"%d\",\"pressure\":\"%f\"}", dweller_id, temp, humid, timestamp, pres);
+    http.begin(client, serverName);
+    http.addHeader("Content-Type", "text/plain");
+    int httpResponseCode = http.POST(post_buff);
+    http.end();
+    disableWiFi();
+    return 1;  
 }
 
 int call_home() {
@@ -82,21 +104,15 @@ int call_home() {
     HTTPClient http;
     int timestamp = timeClient.getEpochTime();
     int first_stamp = timestamp - (TIME_TO_SLEEP * max_samples);
-
-    //Serial.print("First timestamp: ");
-    //Serial.println(first_stamp);
     int counter = 0;
     
     while(counter < max_samples) {
         memset(post_buff, 0, 256);
         sprintf(post_buff, "{\"dweller\":\"%d\",\"temp\":\"%f\",\"humid\":\"%d\",\"timestamp\":\"%d\",\"pressure\":\"%f\"}", dweller_id, samples[counter].temp, samples[counter].humid, first_stamp + (TIME_TO_SLEEP * counter),samples[counter].pres);
-        //Serial.printf(post_buff);
         http.begin(client, serverName);
         http.addHeader("Content-Type", "text/plain");
         int httpResponseCode = http.POST(post_buff);     
         http.end();
-        //Serial.print("HTTP Response code: ");
-        //Serial.println(httpResponseCode);
         counter++;
     }  
     disableWiFi();
@@ -105,12 +121,34 @@ int call_home() {
 }
 
 void setup() {
-    setCpuFrequencyMhz(10);
-    measure();
-    if(boot_counter >= max_samples) {
-        call_home();
+    esp_sleep_wakeup_cause_t wakeup_reason;
+    wakeup_reason = esp_sleep_get_wakeup_cause();
+    pinMode(ledPin, OUTPUT);
+
+    if(wakeup_reason == ESP_SLEEP_WAKEUP_TIMER) {
+        measure();
+        if(boot_counter >= max_samples) {
+            call_home();
+        }
+    } else if(wakeup_reason == ESP_SLEEP_WAKEUP_EXT1) {
+        digitalWrite(ledPin, HIGH);
+        delay(200);
+        one_shot();
+        digitalWrite(ledPin, LOW);
+    } else {
+        digitalWrite(ledPin, HIGH);
+        delay(50);
+        digitalWrite(ledPin, LOW);
+        delay(50);
+        digitalWrite(ledPin, HIGH);
+        delay(50);
+        digitalWrite(ledPin, LOW);
+        delay(50);
+        digitalWrite(ledPin, HIGH);
+        delay(50);
+        digitalWrite(ledPin, LOW);
     }
-    //Serial.println("Going to sleep");
+    esp_sleep_enable_ext1_wakeup(BUTTON_PIN_BITMASK,ESP_EXT1_WAKEUP_ALL_LOW);
     esp_sleep_enable_timer_wakeup((TIME_TO_SLEEP * uS_TO_S_FACTOR) - (CLOCK_TWEAK));
     esp_deep_sleep_start();
 }
