@@ -10,6 +10,8 @@
 #include <HTTPClient.h>
 #include "Arduino.h"
 
+//Add BME280 power save
+
 const char* ssid = "umad";
 const char* password = "usickcunt001";
 const char* serverName = "http://192.168.1.196:5000/api/sample/";
@@ -22,10 +24,11 @@ const int ledPin = 25;
 #define BUTTON_PIN_BITMASK 0x800000000
 
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP  60       /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP  60 * 5       /* Time ESP32 will go to sleep (in seconds) */
 #define CLOCK_TWEAK 0.05 * uS_TO_S_FACTOR
 #define max_samples 290
 #define dweller_id 2
+#define BME_ADDRESS 0x76
 
 typedef struct {
     int humid;
@@ -36,9 +39,26 @@ typedef struct {
 RTC_DATA_ATTR int boot_counter = 0;
 RTC_DATA_ATTR measurement samples[max_samples]; 
 
+void BME280_Sleep(int device_address) {
+  const uint8_t CTRL_MEAS_REG = 0xF4;
+  // BME280 Register 0xF4 (control measurement register) sets the device mode, specifically bits 1,0
+  // The bit positions are called 'mode[1:0]'. See datasheet Table 25 and Paragraph 3.3 for more detail.
+  // Mode[1:0]  Mode
+  //    00      'Sleep'  mode
+  //  01 / 10   'Forced' mode, use either '01' or '10'
+  //    11      'Normal' mode
+  Wire.beginTransmission(device_address);
+  Wire.requestFrom(device_address, 1);
+  uint8_t value = Wire.read();
+  value = (value & 0xFC) + 0x00;         // Clear bits 1 and 0
+  Wire.write((uint8_t)CTRL_MEAS_REG);    // Select Control Measurement Register
+  Wire.write((uint8_t)value);            // Send 'XXXXXX00' for Sleep mode
+  Wire.endTransmission();
+}
+
 int measure() {
     Adafruit_BME280 bme;
-    int status = bme.begin(0x76);
+    int status = bme.begin(BME_ADDRESS);
 
     int humid = bme.readHumidity();
     float temp = bme.readTemperature();
@@ -48,6 +68,7 @@ int measure() {
     samples[boot_counter].humid = humid;
     samples[boot_counter].pres = pres;
     boot_counter++;
+    BME280_Sleep(BME_ADDRESS);  
     return 1;
 }
 
@@ -78,7 +99,7 @@ int one_shot() {
     HTTPClient http;
     int timestamp = timeClient.getEpochTime();
     Adafruit_BME280 bme;
-    int status = bme.begin(0x76);
+    int status = bme.begin(BME_ADDRESS);
     int humid = bme.readHumidity();
     float temp = bme.readTemperature();
     float pres = bme.readPressure() / 100.0F;
@@ -89,6 +110,7 @@ int one_shot() {
     int httpResponseCode = http.POST(post_buff);
     http.end();
     disableWiFi();
+    BME280_Sleep(BME_ADDRESS);  
     return 1;  
 }
 
