@@ -62,6 +62,7 @@ if __name__ == "__main__":
     config = init_config('config.ini')
     dt1 = get_dweller_data(config, (1,))
     dt2 = get_dweller_data(config, (2,))
+    dt3 = get_dweller_data(config, (3,))
     
     temp = []
     humid = []
@@ -87,16 +88,28 @@ if __name__ == "__main__":
         pressure2.append(r[2])
         timestamp2.append(datetime.datetime.fromtimestamp(r[3]))
 
+    temp3 = []
+    humid3 = []
+    pressure3 = []
+    timestamp3 = []
+
+    for item in dt3:
+        r = list(item.values())
+        temp3.append(r[0])
+        humid3.append(r[1])
+        pressure3.append(r[2])
+        timestamp3.append(datetime.datetime.fromtimestamp(r[3]))
+
     fig, axs = plt.subplots(3, 1)
-    axs[0].plot(timestamp, temp, timestamp2, temp2)
+    axs[0].plot(timestamp, temp, timestamp2, temp2, timestamp3, temp3)
     axs[0].set_xlabel('time')
     axs[0].set_ylabel('temp')
 
-    axs[1].plot(timestamp, humid, timestamp2, humid2)
+    axs[1].plot(timestamp, humid, timestamp2, humid2, timestamp3, humid3)
     axs[1].set_xlabel('time')
     axs[1].set_ylabel('humid')
 
-    axs[2].plot(timestamp, pressure, timestamp2, pressure2)
+    axs[2].plot(timestamp, pressure, timestamp2, pressure2, timestamp3, pressure3)
     axs[2].set_xlabel('time')
     axs[2].set_ylabel('pressure')
 
