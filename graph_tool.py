@@ -93,12 +93,18 @@ if __name__ == "__main__":
     pressure3 = []
     timestamp3 = []
 
-    for item in dt3:
+    for idx, item in enumerate(dt3):
         r = list(item.values())
         temp3.append(r[0])
         humid3.append(r[1])
         pressure3.append(r[2])
-        timestamp3.append(datetime.datetime.fromtimestamp(r[3]))
+        if(r[3] == 1):
+            print("It's wrong!")
+            rx = list(dt3[idx-1].values())
+            print(rx[3])
+            timestamp3.append(datetime.datetime.fromtimestamp(rx[3]+300))
+        else:
+            timestamp3.append(datetime.datetime.fromtimestamp(r[3]))
 
     fig, axs = plt.subplots(3, 1)
     axs[0].plot(timestamp, temp, timestamp2, temp2, timestamp3, temp3)
