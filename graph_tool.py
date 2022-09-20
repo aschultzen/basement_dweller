@@ -6,6 +6,11 @@ import os
 import sys
 import configparser
 
+FIRST_EPOCH = 1609459200
+LAST_EPOCH = 1893456000
+FIVE_MINUTES = 300
+LAST_VALID_TIMESTAMP = 1609459200
+
 def connect_to_db(config):
 	config = {
 	  'user': config['database']['User'],
@@ -58,6 +63,16 @@ def get_dweller_data(config, dweller):
             print("Something went wrong: {}".format(err),0)
     return -1
 
+def produce_date(timestamp):
+    mod_timestamp = timestamp
+    global LAST_VALID_TIMESTAMP
+    if(timestamp > LAST_EPOCH or timestamp < FIRST_EPOCH):
+        mod_timestamp = LAST_VALID_TIMESTAMP + FIVE_MINUTES;
+        print("Invalid timestamp %d, using %d instead" % (timestamp,mod_timestamp))
+    
+    LAST_VALID_TIMESTAMP = mod_timestamp # Not really a valid timestamp...
+    return datetime.datetime.fromtimestamp(mod_timestamp)
+
 if __name__ == "__main__":
     config = init_config('config.ini')
     dt1 = get_dweller_data(config, (1,))
@@ -74,7 +89,7 @@ if __name__ == "__main__":
         temp.append(r[0])
         humid.append(r[1])
         pressure.append(r[2])
-        timestamp.append(datetime.datetime.fromtimestamp(r[3]))
+        timestamp.append(produce_date(r[3]))
 
     temp2 = []
     humid2 = []
@@ -86,7 +101,7 @@ if __name__ == "__main__":
         temp2.append(r[0])
         humid2.append(r[1])
         pressure2.append(r[2])
-        timestamp2.append(datetime.datetime.fromtimestamp(r[3]))
+        timestamp2.append(produce_date(r[3]))
 
     temp3 = []
     humid3 = []
@@ -98,16 +113,12 @@ if __name__ == "__main__":
         temp3.append(r[0])
         humid3.append(r[1])
         pressure3.append(r[2])
-        if(r[3] == 1):
-            print("It's wrong!")
-            rx = list(dt3[idx-1].values())
-            print(rx[3])
-            timestamp3.append(datetime.datetime.fromtimestamp(rx[3]+300))
-        else:
-            timestamp3.append(datetime.datetime.fromtimestamp(r[3]))
+        timestamp3.append(produce_date(r[3]))
 
     fig, axs = plt.subplots(3, 1)
-    axs[0].plot(timestamp, temp, timestamp2, temp2, timestamp3, temp3)
+    axs[0].plot(timestamp, temp, label="Dweller 1")
+    axs[0].plot(timestamp2, temp2,label="Dweller 2")
+    axs[0].plot(timestamp3, temp3, label="Dweller 3")
     axs[0].set_xlabel('time')
     axs[0].set_ylabel('temp')
 
@@ -120,4 +131,5 @@ if __name__ == "__main__":
     axs[2].set_ylabel('pressure')
 
     fig.tight_layout()
+    #plt.legend(ncol=3, loc="upper right")
     plt.show()
