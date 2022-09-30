@@ -13,19 +13,18 @@ const char* ssid = "umad";
 const char* password = "usickcunt001";
 const char* serverName = "http://192.168.1.196:5000/api/bulksample/";
 
-const int left_button = 32;     
-const int right_button = 33;     
-const int red_button = 35;     
-const int ledPin = 25;
-
-#define BUTTON_PIN_BITMASK 0x800000000
-
 #define uS_TO_S_FACTOR 1000000  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP 60 * 5       /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP 60 * 10       /* Time ESP32 will go to sleep (in seconds) */
 #define CLOCK_TWEAK 0.05 * uS_TO_S_FACTOR
 #define max_samples 290
-#define dweller_id 5
 #define BME_ADDRESS 0x76
+#define WIFI_TIMEOUT 10000
+
+#define dweller_id 3
+IPAddress staticIP(192, 168, 1, 230);
+IPAddress gateway(192, 168, 1, 1);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress dns(192, 168, 1, 1);
 
 typedef struct {
     int humid;
@@ -35,7 +34,6 @@ typedef struct {
 
 RTC_DATA_ATTR int boot_counter = 0;
 RTC_DATA_ATTR measurement samples[max_samples]; 
-
 BME280 bme;
 
 void bmeForceRead() {
@@ -65,12 +63,14 @@ void disableWiFi(){
 
 void enableWiFi(){
     WiFi.disconnect(false);  // Reconnect the network
-    WiFi.mode(WIFI_STA);    // Switch WiFi off
+    WiFi.mode(WIFI_STA);    // Switch WiFi on
     WiFi.begin(ssid, password);
  
-    while (WiFi.status() != WL_CONNECTED) {
-        1+1;
-    }
+    unsigned long startAttemptTime = millis();
+    while (WiFi.status() != WL_CONNECTED && 
+        millis() - startAttemptTime < WIFI_TIMEOUT){
+    delay(10);
+  }
 }
 
 int call_home() {
@@ -81,14 +81,19 @@ int call_home() {
     char *post_buff = (char*)malloc((128 * max_samples) * sizeof(char));
     if (post_buff == NULL)
     {
-        Serial.println("Failed to malloc post_buff!");
+        1+1;
+        //Serial.println("Failed to malloc post_buff!");
     }
 
     memset(post_buff, 0,128 * max_samples);
 
     enableWiFi();
     timeClient.begin();  
-    timeClient.update(); /* MAKE SURE IT ACTUALLY GET*S UPDATED! */
+    
+    while(!timeClient.update()) {
+        timeClient.forceUpdate();
+    }
+
     WiFiClient client;
     HTTPClient http;
     int timestamp = timeClient.getEpochTime();
@@ -111,25 +116,25 @@ int call_home() {
     
     http.begin(client, serverName);
     http.addHeader("Content-Type", "text/plain");
-    int httpResponseCode = http.POST(post_buff);     
+    int httpResponseCode = http.POST(post_buff);   
     http.end();
 
     disableWiFi();
     boot_counter = 0;
 
     free(post_buff); 
-    Serial.print("Time used:");
-    Serial.println(millis() - start);
     return 1;
 }
 
 void setup() {
+    setCpuFrequencyMhz(80);
+
     Wire.begin();
     bme.setI2CAddress(BME_ADDRESS);
     
     if (bme.beginI2C() == false) //Begin communication over I2C
     {
-        delay(0.5);
+        delay(0.1);
     }
 
     measure();
